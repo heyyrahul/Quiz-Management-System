@@ -9,7 +9,6 @@ import HomePage from "./pages/HomePage";
 const QuizPage = lazy(() => import("./pages/QuizPage"));
 const QuizResultPage = lazy(() => import("./pages/QuizResultPage"));
 const AdminDashboard = lazy(() => import("./pages/AdminDashboard"));
-const AdminQuizList = lazy(() => import("../../../JalsaMeet/AdminQuizList"));
 const AdminQuizForm = lazy(() => import("./pages/AdminQuizForm"));
 const Login = lazy(() => import("./pages/Login"));
 
@@ -32,15 +31,7 @@ function App() {
             element={
               <ProtectedRoute>
                 <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/quizzes"
-            element={
-              <ProtectedRoute>
-                <AdminQuizList />
-              </ProtectedRoute>
+              </ProtectedRoute> 
             }
           />
           <Route
