@@ -14,13 +14,7 @@ const app = express();
 // Middlewares
 app.use(express.json());
 app.use(cookieParser());
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL,
-    credentials: true,
-  })
-);
-
+app.use(cors());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/quizzes", quizRoutes);
@@ -33,4 +27,3 @@ app.get("/", (req, res) => {
 });
 
 module.exports = app;
-  
