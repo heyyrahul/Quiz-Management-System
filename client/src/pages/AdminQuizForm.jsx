@@ -16,10 +16,10 @@ import {
   DialogContentText,
 } from "@mui/material";
 import { useNavigate, useParams } from "react-router-dom";
-import { 
-  Add, 
-  Delete, 
-  CheckCircleOutline as SuccessIcon 
+import {
+  Add,
+  Delete,
+  CheckCircleOutline as SuccessIcon,
 } from "@mui/icons-material";
 import {
   createQuizApi,
@@ -44,6 +44,9 @@ const AdminQuizForm = ({ mode = "create" }) => {
   const [description, setDescription] = useState("");
   const [questions, setQuestions] = useState([emptyQuestion]);
   const [loading, setLoading] = useState(isEdit);
+  
+  // Validation State
+  const [errors, setErrors] = useState({});
 
   // State for Success Modal
   const [showSuccess, setShowSuccess] = useState(false);
@@ -77,18 +80,86 @@ const AdminQuizForm = ({ mode = "create" }) => {
     loadQuiz();
   }, [isEdit, quizId]);
 
+  // --- VALIDATION LOGIC ---
+  const validateForm = () => {
+    let tempErrors = {};
+    let isValid = true;
+
+    if (!title.trim()) tempErrors.title = "Title is required.";
+    if (!genre.trim()) tempErrors.genre = "Genre is required.";
+    if (!description.trim()) tempErrors.description = "Description is required.";
+
+    questions.forEach((q, index) => {
+      // 1. Check Question Text
+      if (!q.question.trim()) {
+        tempErrors[`q_${index}_question`] = "Question text is required.";
+      }
+
+      // 2. Check Correct Answer existence
+      if (!q.correctAnswer.trim()) {
+        tempErrors[`q_${index}_correct`] = "Correct answer is required.";
+      }
+
+      // 3. Specific Logic per Type
+      if (q.type === "mcq") {
+        // Check empty options
+        q.options.forEach((opt, optIndex) => {
+          if (!opt.trim()) {
+            tempErrors[`q_${index}_opt_${optIndex}`] = "Option cannot be empty.";
+          }
+        });
+
+        // Check if Correct Answer matches one of the options (Case sensitive usually, but depends on your backend)
+        if (
+          q.correctAnswer.trim() &&
+          !q.options.some((opt) => opt.trim() === q.correctAnswer.trim())
+        ) {
+          tempErrors[`q_${index}_correct`] = "Answer must match one of the options exactly.";
+        }
+      } 
+      
+      else if (q.type === "truefalse") {
+        const val = q.correctAnswer.toLowerCase();
+        if (val !== "true" && val !== "false") {
+          tempErrors[`q_${index}_correct`] = "Answer must be 'True' or 'False'.";
+        }
+      }
+    });
+
+    setErrors(tempErrors);
+    isValid = Object.keys(tempErrors).length === 0;
+    return isValid;
+  };
+
   const handleQuestionChange = (index, field, value) => {
     setQuestions((prev) =>
-      prev.map((q, i) =>
-        i === index
-          ? {
-              ...q,
-              [field]: value,
-              ...(field === "type" && value !== "mcq" ? { options: [] } : {}),
-            }
-          : q
-      )
+      prev.map((q, i) => {
+        if (i !== index) return q;
+
+
+        const updatedQuestion = { ...q, [field]: value };
+
+
+        if (field === "type") {
+          if (value === "mcq") {
+
+            updatedQuestion.options = ["", "", "", ""];
+          } else {
+
+            updatedQuestion.options = [];
+          }
+
+          updatedQuestion.correctAnswer = "";
+        }
+
+        return updatedQuestion;
+      })
     );
+
+
+    if (errors[`q_${index}_${field}`]) {
+      setErrors((prev) => ({ ...prev, [`q_${index}_${field}`]: null }));
+    }
   };
 
   const handleOptionChange = (qIndex, optIndex, value) => {
@@ -102,6 +173,11 @@ const AdminQuizForm = ({ mode = "create" }) => {
           : q
       )
     );
+    
+
+    if (errors[`q_${qIndex}_opt_${optIndex}`]) {
+      setErrors((prev) => ({ ...prev, [`q_${qIndex}_opt_${optIndex}`]: null }));
+    }
   };
 
   const addQuestion = () => {
@@ -112,10 +188,18 @@ const AdminQuizForm = ({ mode = "create" }) => {
     setQuestions((prev) =>
       prev.length === 1 ? prev : prev.filter((_, i) => i !== index)
     );
+    // Note: In a real app, you might want to cleanup errors for the deleted index here, 
+    // but re-validating on submit handles it.
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!validateForm()) {
+      // Optional: Scroll to top if validation fails
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      return;
+    }
 
     const payload = {
       title,
@@ -146,6 +230,12 @@ const AdminQuizForm = ({ mode = "create" }) => {
   const handleCloseSuccess = () => {
     setShowSuccess(false);
     navigate("/admin");
+  };
+
+
+  const handleChange = (setter, field) => (e) => {
+    setter(e.target.value);
+    if (errors[field]) setErrors((prev) => ({ ...prev, [field]: null }));
   };
 
   if (loading) {
@@ -192,14 +282,18 @@ const AdminQuizForm = ({ mode = "create" }) => {
               label="Title"
               fullWidth
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={handleChange(setTitle, "title")}
+              error={!!errors.title}
+              helperText={errors.title}
             />
             <TextField
               label="Genre"
               fullWidth
               value={genre}
-              onChange={(e) => setGenre(e.target.value)}
+              onChange={handleChange(setGenre, "genre")}
               placeholder="e.g. Programming, GK, DSA"
+              error={!!errors.genre}
+              helperText={errors.genre}
             />
             <TextField
               label="Description"
@@ -207,7 +301,9 @@ const AdminQuizForm = ({ mode = "create" }) => {
               multiline
               minRows={2}
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={handleChange(setDescription, "description")}
+              error={!!errors.description}
+              helperText={errors.description}
             />
           </Stack>
         </CardContent>
@@ -225,6 +321,7 @@ const AdminQuizForm = ({ mode = "create" }) => {
             sx={{
               borderRadius: 3,
               boxShadow: "0 10px 24px rgba(15,23,42,0.06)",
+              border: errors[`q_${index}_question`] || errors[`q_${index}_correct`] ? "1px solid #d32f2f" : "none"
             }}
           >
             <CardContent sx={{ p: 3 }}>
@@ -254,6 +351,8 @@ const AdminQuizForm = ({ mode = "create" }) => {
                   onChange={(e) =>
                     handleQuestionChange(index, "question", e.target.value)
                   }
+                  error={!!errors[`q_${index}_question`]}
+                  helperText={errors[`q_${index}_question`]}
                 />
 
                 <TextField
@@ -282,6 +381,8 @@ const AdminQuizForm = ({ mode = "create" }) => {
                         onChange={(e) =>
                           handleOptionChange(index, optIndex, e.target.value)
                         }
+                        error={!!errors[`q_${index}_opt_${optIndex}`]}
+                        helperText={errors[`q_${index}_opt_${optIndex}`]}
                       />
                     ))}
                   </Stack>
@@ -299,6 +400,8 @@ const AdminQuizForm = ({ mode = "create" }) => {
                       ? "True or False"
                       : "Must exactly match one of the options for MCQ"
                   }
+                  error={!!errors[`q_${index}_correct`]}
+                  helperText={errors[`q_${index}_correct`]}
                 />
               </Stack>
             </CardContent>

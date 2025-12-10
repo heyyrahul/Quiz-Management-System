@@ -7,6 +7,9 @@ import {
   Typography,
   Button,
   Stack,
+  Snackbar,
+  Alert,
+  CircularProgress,
 } from "@mui/material";
 import { Lock } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
@@ -16,22 +19,58 @@ import { saveAuthToken } from "../utils/auth";
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false); 
   const navigate = useNavigate();
+
+
+  const [notification, setNotification] = useState({
+    open: false,
+    message: "",
+    severity: "success",
+  });
+
+  const handleCloseNotification = (event, reason) => {
+    if (reason === "clickaway") return;
+    setNotification({ ...notification, open: false });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+
+
+    if (!email || !password || loading) return;
+
+    setLoading(true); 
 
     try {
       const data = await loginAdminApi(email, password);
       saveAuthToken(data.token);
-      navigate("/admin");
+
+
+      setNotification({
+        open: true,
+        message: "Login successful! Redirecting...",
+        severity: "success",
+      });
+
+
+      setTimeout(() => {
+        navigate("/admin");
+      }, 1500);
+      
     } catch (err) {
       console.error("Login error", err);
       const msg =
-        err.response?.data?.message || "Login failed. Please try again.";
-      setError(msg);
+        err.response?.data?.message || "Login failed. Please check your credentials.";
+
+
+      setNotification({
+        open: true,
+        message: msg,
+        severity: "error",
+      });
+      
+      setLoading(false);
     }
   };
 
@@ -57,12 +96,6 @@ const Login = () => {
             Sign in to continue
           </Typography>
 
-          {error && (
-            <Typography color="error" sx={{ mb: 1, fontSize: 14 }}>
-              {error}
-            </Typography>
-          )}
-
           <Box component="form" onSubmit={handleSubmit}>
             <Stack spacing={2}>
               <TextField
@@ -72,6 +105,7 @@ const Login = () => {
                 placeholder="admin@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                disabled={loading} 
               />
 
               <TextField
@@ -81,31 +115,58 @@ const Login = () => {
                 placeholder="admin123"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
               />
 
               <Button
                 variant="contained"
                 type="submit"
                 fullWidth
+                disabled={loading} 
                 sx={{
                   borderRadius: 999,
                   py: 1.2,
                   textTransform: "none",
                   fontWeight: 600,
-                  backgroundImage:
-                    "linear-gradient(90deg, #0fb8b0, #14b8ff)",
+                  backgroundImage: "linear-gradient(90deg, #0fb8b0, #14b8ff)",
+
+                  "&.Mui-disabled": {
+                    backgroundImage: "linear-gradient(90deg, #0fb8b0, #14b8ff)",
+                    opacity: 0.7,
+                    color: "#fff"
+                  },
                   "&:hover": {
-                    backgroundImage:
-                      "linear-gradient(90deg, #0aa59e, #0ea5e9)",
+                    backgroundImage: "linear-gradient(90deg, #0aa59e, #0ea5e9)",
                   },
                 }}
               >
-                Login
+                {loading ? (
+                  <CircularProgress size={24} color="inherit" />
+                ) : (
+                  "Login"
+                )}
               </Button>
             </Stack>
           </Box>
         </CardContent>
       </Card>
+
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={4000}
+        onClose={handleCloseNotification}
+        anchorOrigin={{ vertical: "top", horizontal: "center" }}
+      >
+        <Alert
+          onClose={handleCloseNotification}
+          severity={notification.severity}
+          variant="filled"
+          sx={{ width: "100%", borderRadius: 2 }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
     </Box>
   );
 };
